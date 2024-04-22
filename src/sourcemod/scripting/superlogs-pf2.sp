@@ -822,6 +822,7 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 
 public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	char wep[64];
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new victim = GetClientOfUserId(GetEventInt(event, "userid"));
 	new customkill = GetEventInt(event, "customkill");
@@ -871,6 +872,30 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 			}
 	}
 	
+	if(victim != attacker)
+	{
+		GetEventString(event, "weapon", wep, sizeof(wep), "");
+		
+		if(StrContains(wep, "obj_d") == 0)
+		{
+			SetEventString(event, "weapon", "detonation_dispenser");
+			SetEventString(event, "weapon_logclassname", "detonation_dispenser");
+		}
+		else if(StrContains(wep, "obj_t") == 0)
+		{
+			if(customkill == 10)
+			{
+			SetEventString(event, "weapon", "detonation_teleporter");
+			SetEventString(event, "weapon_logclassname", "detonation_teleporter");
+			}
+			else
+			{
+			SetEventString(event, "weapon", "telefrag");
+			SetEventString(event, "weapon_logclassname", "telefrag");
+			}
+
+		}
+	}
 	return Plugin_Continue;
 }
 
