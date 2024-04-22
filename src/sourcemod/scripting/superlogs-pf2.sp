@@ -605,41 +605,6 @@ public Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
 	dalokohs[client] = -30.0;
 }
 
-public Event_ObjectRemoved(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new Float:time = GetGameTime();
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if(time != f_objRemoved[client])
-	{
-		f_objRemoved[client] = time;
-		while(PopStack(h_objList[client]))
-			continue;
-	}
-	new objtype = GetEventInt(event, "objecttype");
-	new objindex = GetEventInt(event, "index");
-	PushStackCell(h_objList[client], objtype);
-}
-
-public Event_PlayerStealsandvich(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	LogPlyrPlyrEvent(GetClientOfUserId(GetEventInt(event, "target")), GetClientOfUserId(GetEventInt(event, "owner")), "triggered", "steal_sandvich", true);
-}
-
-public Event_PlayerStunned(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new String: properties[33];
-	new stunner = GetClientOfUserId(GetEventInt(event, "stunner"));
-	if(stunner > 0) // Stunner == 0 would be map stun (ghost/trigger), natascha stun (slowdown), taunt kill stun (medic, sniper)
-	{
-		new victim = GetClientOfUserId(GetEventInt(event, "victim"));
-		if(GetEventBool(event, "victim_capping")) StrCat(properties, sizeof(properties), " (victim_capping)");
-		if(GetEventBool(event, "big_stun")) StrCat(properties, sizeof(properties), " (big_stun)");
-		LogPlyrPlyrEvent(stunner, victim, "triggered", "stun", true);
-		if((GetEntityFlags(victim) & (FL_ONGROUND | FL_INWATER)) == 0)
-			LogPlayerEvent(stunner, "triggered", "airshot_stun");
-	}
-}
-
 public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new builderid = GetClientOfUserId(GetEventInt(event, "builderid"));
@@ -774,10 +739,6 @@ public Event_PlayerBuiltObject(Handle:event, const String:name[], bool:dontBroad
 public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new death_flags = GetEventInt(event, "death_flags");
-	if((death_flags & TF_DEATHFLAG_DEADRINGER) == TF_DEATHFLAG_DEADRINGER) // Not a dead ringer death?
-	{
-		return;
-	}
 	
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
@@ -785,7 +746,7 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 	new bits = GetEventInt(event, "damagebits");
 	jumpStatus[client] = JUMP_NONE; // Not jumping
 	g_bCarryingObject[client] = false;
-	PrintToServer("Customkill: %i Bits: %i", customkill, bits);
+	//PrintToServer("Customkill: %i Bits: %i Flags: %i", customkill, bits, death_flags);
 	if(b_actions)
 	{
 		if(attacker == client && customkill == TF_CUSTOM_SUICIDE)
@@ -810,6 +771,17 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 			if(bits & DMG_DROWN)
 			{
 				LogPlayerEvent(client, "triggered", "drowned");
+			}
+			else if(customkill == 0 && death_flags == 0)
+			{
+				if(bits == 65536)
+				{
+					LogPlayerEvent(client, "triggered", "death_sawblade");
+				}
+				else if(bits == 1 || bits == 16)
+				{
+					LogPlayerEvent(client, "triggered", "hit_by_train");
+				}
 			}
 			else if(attacker != client)
 			{
