@@ -22,14 +22,14 @@
 #pragma semicolon 1
 
 #include <sourcemod>
-#include <pf2> // NOTE: Gives us tf2 AND sdktools
+#include <pf2>
 #include <loghelper> // http://forums.alliedmods.net/showthread.php?t=100084
 #undef REQUIRE_EXTENSIONS
 #include <sdkhooks> // http://forums.alliedmods.net/showthread.php?t=106748
 #define REQUIRE_EXTENSIONS
 
 #define VERSION "2.0.32"
-#define NAME "SuperLogs: TF2"
+#define NAME "SuperLogs: PF2"
 
 #define UNLOCKABLE_BIT (1<<30)
 #define MAX_LOG_WEAPONS 28
@@ -79,7 +79,6 @@ new Handle:cvar_teleports;
 new Handle:cvar_teleports_again;
 new Handle:cvar_headshots;
 new Handle:cvar_backstabs;
-new Handle:cvar_sandvich;
 new Handle:cvar_fire;
 new Handle:cvar_wstats;
 new Handle:cvar_rolelogfix;
@@ -90,7 +89,6 @@ new bool:b_teleports;
 new bool:b_teleports_again;
 new bool:b_headshots;
 new bool:b_backstabs;
-new bool:b_sandvich;
 new bool:b_fire;
 new bool:b_wstats;
 new bool:b_rolelogfix;
@@ -217,7 +215,6 @@ public OnPluginStart()
 	cvar_teleports_again = CreateConVar("superlogs_teleports_again", "1", "Repeated use of same teleporter in 10 seconds adds _again to event (default on)", 0, true, 0.0, true, 1.0);
 	cvar_headshots = CreateConVar("superlogs_headshots", "0", "Enable logging of headshot player action (default off)", 0, true, 0.0, true, 1.0);
 	cvar_backstabs = CreateConVar("superlogs_backstabs", "1", "Enable logging of backstab player action (default on)", 0, true, 0.0, true, 1.0);
-	cvar_sandvich = CreateConVar("superlogs_sandvich", "1", "Enable logging of sandvich eating (default on)", 0, true, 0.0, true, 1.0);
 	cvar_fire = CreateConVar("superlogs_fire", "1", "Enable logging of fiery arrows as a separate weapon from regular arrows (default on)", 0, true, 0.0, true, 1.0);
 	cvar_wstats = CreateConVar("superlogs_wstats", "1", "Enable logging of weapon stats (default on, only works when tf_weapon_criticals is 1)", 0, true, 0.0, true, 1.0);
 	cvar_rolelogfix = CreateConVar("superlogs_rolelogfix", "1", "Enable logging of healpoints upon death (default on)", 0, true, 0.0, true, 1.0);
@@ -228,7 +225,6 @@ public OnPluginStart()
 	HookConVarChange(cvar_teleports_again,OnConVarTeleportsAgainChange);
 	HookConVarChange(cvar_headshots,OnConVarHeadshotsChange);
 	HookConVarChange(cvar_backstabs,OnConVarBackstabsChange);
-	HookConVarChange(cvar_sandvich,OnConVarSandvichChange);
 	HookConVarChange(cvar_fire,OnConVarFireChange);
 	HookConVarChange(cvar_wstats,OnConVarStatsChange);
 	HookConVarChange(cvar_rolelogfix,OnConVarRolelogfixChange);
@@ -267,7 +263,9 @@ public OnPluginStart()
 	HookEvent("player_spawn", Event_PlayerSpawn);
 	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
 	//HookEvent("post_inventory_application", Event_PostInventoryApplication);
-
+	HookEvent("grenade_thrown", Event_ThrowGrenade);
+	HookEvent("grenade_disarmed", Event_DisarmGrenade);
+	
 	HookEvent("arena_win_panel", Event_WinPanel);
 	HookEvent("teamplay_win_panel", Event_WinPanel);
 	
@@ -294,7 +292,6 @@ public OnConfigsExecuted()
 	OnConVarTeleportsAgainChange(cvar_teleports_again, "", "");
 	OnConVarHeadshotsChange(cvar_headshots, "", "");
 	OnConVarBackstabsChange(cvar_backstabs, "", "");
-	OnConVarSandvichChange(cvar_sandvich, "", "");
 	OnConVarFireChange(cvar_fire, "", "");
 	OnConVarRolelogfixChange(cvar_rolelogfix, "", "");
 }
@@ -342,7 +339,7 @@ public Action:OnGameLog(const String:message[])
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	if(b_actions && attacker > 0 && attacker <= MaxClients && attacker != victim && inflictor > MaxClients && damage > 0.0 && IsValidEntity(inflictor) && (GetEntityFlags(victim) & (FL_ONGROUND | FL_INWATER)) == 0)
+	if(b_actions && attacker > 0 && attacker <= MaxClients && attacker != victim && inflictor > MaxClients && damage > 0.0 && IsValidEntity(inflictor) && GetClientDistanceToGround(victim) >= 100)
 	{
 		decl String:weapon[WEAPON_FULL_LENGTH];
 		GetEdictClassname(inflictor, weapon, sizeof(weapon));
@@ -353,7 +350,7 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 				case 'r':
 				{
 					LogPlayerEvent(attacker, "triggered", "airshot_rocket");
-					if(jumpStatus[attacker] == JUMP_ROCKET)
+					if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_rocket");
 				}
 				case 'p':
@@ -361,21 +358,16 @@ public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damage
 					if(weapon[18] != 0)
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_sticky");
-						if(jumpStatus[attacker] == JUMP_STICKY)
+						if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_sticky");
 					}
 					else
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_pipebomb");
-						if(jumpStatus[attacker] == JUMP_STICKY)
+						if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_pipebomb");
 					}
 				}
-				case 'a':
-					LogPlayerEvent(attacker, "triggered", "airshot_arrow");
-				case 'f':
-					if(damage > 10.0)
-						LogPlayerEvent(attacker, "triggered", "airshot_flare");
 			}
 		}
 	}
@@ -519,6 +511,22 @@ public Action:Event_PlayerDisconnect(Handle:event, const String:name[], bool:don
 	return Plugin_Continue;
 }
 
+public Action:Event_ThrowGrenade(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new client = GetEventInt(event, "player");
+	LogPlayerEvent(client, "triggered", "grenade_throw");
+	
+	return Plugin_Continue;
+}
+
+public Action:Event_DisarmGrenade(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new client = GetEventInt(event, "player");
+	LogPlayerEvent(client, "triggered", "grenade_disarm");
+	
+	return Plugin_Continue;
+}
+
 HookAllClients()
 {
 	for (new i = 1; i <= MaxClients; i++)
@@ -637,11 +645,6 @@ public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadc
 	f_lastTeleport[builderid][userid] = curTime;
 }
 
-public Event_DeployBuffBanner(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	LogPlayerEvent(GetClientOfUserId(GetEventInt(event, "buff_owner")), "triggered", "buff_deployed");
-}
-
 public Event_MedicDefended(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	LogPlayerEvent(GetClientOfUserId(GetEventInt(event, "userid")), "triggered", "defended_medic");
@@ -675,38 +678,27 @@ public Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 		{
 			new client = GetClientOfUserId(GetEventInt(event, "userid"));
 			if(client != attacker && client > 0 && client <= MaxClients && IsClientInGame(client)
-				&& IsPlayerAlive(client) && (GetEntityFlags(client) & (FL_ONGROUND | FL_INWATER)) == 0)
+				&& IsPlayerAlive(client) && GetClientDistanceToGround(client) >= 100)
 			{
 				switch(GetEventInt(event, "weaponid"))
 				{
 					case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_DIRECTHIT:
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_rocket");
-						if(jumpStatus[attacker] == JUMP_ROCKET)
+						if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_rocket");
 					}
 					case TF_WEAPON_GRENADELAUNCHER:
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_pipebomb");
-						if(jumpStatus[attacker] == JUMP_STICKY)
+						if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_pipebomb");
 					}
 					case TF_WEAPON_PIPEBOMBLAUNCHER:
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_sticky");
-						if(jumpStatus[attacker] == JUMP_STICKY)
+						if(GetClientDistanceToGround(attacker) >= 100)
 							LogPlayerEvent(attacker, "triggered", "air2airshot_sticky");
-					}
-					case TF_WEAPON_FLAREGUN:
-					{
-						if(GetEventInt(event, "damageamount") > 10)
-						{
-							LogPlayerEvent(attacker, "triggered", "airshot_flare");
-						}
-					}
-					case TF_WEAPON_COMPOUND_BOW:
-					{
-						LogPlayerEvent(attacker, "triggered", "airshot_arrow");
 					}
 				}
 			}
@@ -797,8 +789,12 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
 					LogPlayerEvent(attacker, "triggered", "first_blood");
 				if (customkill == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
-					&& IsClientInGame(client) && (GetEntityFlags(client) & (FL_ONGROUND | FL_INWATER)) == 0)
+					&& IsClientInGame(client) && GetClientDistanceToGround(client) >= 100)
+				{
 					LogPlayerEvent(attacker, "triggered", "airshot_headshot");
+					if(GetClientDistanceToGround(attacker) >= 100)
+						LogPlayerEvent(attacker, "triggered", "air2airshot_headshot");
+				}
 			}
 		}
 	}
@@ -909,222 +905,6 @@ public Event_WinPanel(Handle:event, const String:name[], bool:dontBroadcast)
 	}
 	if(b_wstats)
 		DumpAllWeaponStats();
-}
-
-public Event_RocketJump(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new status = jumpStatus[client];
-	if(status == JUMP_ROCKET_START) // Taunt kills trigger one event, rocket jumps two
-	{
-		jumpStatus[client] = JUMP_ROCKET;
-		LogPlayerEvent(client, "triggered", "rocket_jump");
-	}
-	else if(status != JUMP_ROCKET)
-		jumpStatus[client] = JUMP_ROCKET_START;
-}
-
-public Event_StickyJump(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if(jumpStatus[client] != JUMP_STICKY)
-	{
-		jumpStatus[client] = JUMP_STICKY;
-		LogPlayerEvent(client, "triggered", "sticky_jump");
-	}
-}
-
-public Event_JumpLanded(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	jumpStatus[GetClientOfUserId(GetEventInt(event, "userid"))] = JUMP_NONE;
-}
-
-public Event_ObjectDeflected(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new owner = GetClientOfUserId(GetEventInt(event, "ownerid"));
-	switch(GetEventInt(event, "weaponid"))
-	{
-		case TF_WEAPON_NONE:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "airblast_player", true);
-		}
-		case TF_WEAPON_ROCKETLAUNCHER:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_rocket", true);
-			if(b_wstats && b_sdkhookloaded)
-			{
-				new weapon_index = GetWeaponIndex("deflect_rocket");
-				if(weapon_index > -1)
-					weaponStats[client][weapon_index][LOG_SHOTS]++;
-			}
-		}
-		case TF_WEAPON_GRENADE_DEMOMAN:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_pipebomb", true);
-			if(b_wstats && b_sdkhookloaded)
-			{
-				new weapon_index = GetWeaponIndex("deflect_promode");
-				if(weapon_index > -1)
-					weaponStats[client][weapon_index][LOG_SHOTS]++;
-			}
-		}
-		case TF_WEAPON_FLAREGUN:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_flare", true);
-			if(b_wstats && b_sdkhookloaded)
-			{
-				new weapon_index = GetWeaponIndex("deflect_flare");
-				if(weapon_index > -1)
-					weaponStats[client][weapon_index][LOG_SHOTS]++;
-			}
-		}
-		case TF_WEAPON_JAR:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_jarate", true);
-		}
-		case TF_WEAPON_COMPOUND_BOW:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_arrow", true);
-			if(b_wstats && b_sdkhookloaded)
-			{
-				new weapon_index = GetWeaponIndex("deflect_arrow");
-				if(weapon_index > -1)
-					weaponStats[client][weapon_index][LOG_SHOTS]++;
-			}
-		}
-		case TF_WEAPON_DIRECTHIT:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_rocket_dh", true);
-			if(b_wstats && b_sdkhookloaded)
-			{
-				new weapon_index = GetWeaponIndex("deflect_rocket");
-				if(weapon_index > -1)
-					weaponStats[client][weapon_index][LOG_SHOTS]++;
-			}
-		}
-		case TF_WEAPON_GRENADE_STUNBALL:
-		{
-			LogPlyrPlyrEvent(client, owner, "triggered", "deflected_baseball", true);
-		}
-	}
-}
-
-public Event_PostInventoryApplication(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	CreateTimer(0.2, CheckPlayerLoadout, GetEventInt(event, "userid"));
-}
-
-public Action:CheckPlayerLoadout(Handle:timer, any:userid)
-{
-	new client = GetClientOfUserId(userid);
-	if (client == 0 || !IsClientInGame(client))
-	{
-		return Plugin_Stop;
-	}
-	
-	new ent = -1;
-	new bool:newLoadout = false;
-	new TFClassType:pClass = playerClass[client];
-	for(new checkslot = 0; checkslot <=5; checkslot++)
-	{
-		if(playerLoadout[client][checkslot][1] != 0 && IsValidEntity(playerLoadout[client][checkslot][1]))
-		{
-			continue;
-		}
-		ent = GetPlayerWeaponSlot(client, checkslot);
-		if(ent == -1)
-		{
-			// Nothing in slot?
-			if(b_sdkhookloaded && checkslot < 3 && (pClass == TFClass_Soldier || pClass == TFClass_DemoMan)) // Maybe gunboats? Or charge n targe?
-			{
-				playerLoadout[client][checkslot][1] = -1;
-				continue;
-			}
-			if(playerLoadout[client][checkslot][0] == -1)
-				continue;
-			playerLoadout[client][checkslot] = {-1, -1};
-			newLoadout = true;
-		}
-		else
-		{
-			new itemindex = GetEntProp(ent, Prop_Send, "m_iItemDefinitionIndex");
-			if(playerLoadout[client][checkslot][0] != itemindex)
-			{
-				playerLoadout[client][checkslot][0] = itemindex;
-				newLoadout = true;
-			}
-			playerLoadout[client][checkslot][1] = EntIndexToEntRef(ent);
-		}
-	}
-	if(b_sdkhookloaded)
-	{
-		if(newLoadout) // Just in case we already updated it due to a hat spawning or being a new client
-			playerLoadoutUpdated[client] = true;
-		CreateTimer(0.2, LogWeaponLoadout, userid);
-		return Plugin_Stop;
-	}
-	if (newLoadout)
-		LogWeaponLoadout(INVALID_HANDLE, userid);
-		
-	return Plugin_Stop;
-}
-
-public Action:LogWeaponLoadout(Handle:timer, any:userid)
-{
-	new client = GetClientOfUserId(userid);
-	if (client > 0 && IsClientInGame(client))
-	{
-		for (new i = 0; i < MAX_LOADOUT_SLOTS; i++)
-		{
-			if(playerLoadout[client][i][0] != -1 && !IsValidEntity(playerLoadout[client][i][1]) || playerLoadout[client][i][1] == 0)
-			{
-				playerLoadout[client][i] = {-1, -1};
-				playerLoadoutUpdated[client] = true;
-			}
-		}
-		if (playerLoadoutUpdated[client] == false)
-			return Plugin_Stop;
-		playerLoadoutUpdated[client] = false;
-		
-		decl String:logString[255];
-		Format(logString, sizeof(logString), " (primary \"%d\") (secondary \"%d\") (melee \"%d\") (pda \"%d\") (pda2 \"%d\") (building \"%d\") (head \"%d\") (misc \"%d\")", playerLoadout[client][0][0], playerLoadout[client][1][0], playerLoadout[client][2][0], playerLoadout[client][3][0], playerLoadout[client][4][0], playerLoadout[client][5][0], playerLoadout[client][6][0], playerLoadout[client][7][0]);
-		
-		LogPlayerEvent(client, "triggered", "player_loadout", _, logString);
-	}
-	return Plugin_Stop;
-}
-
-public Action:Event_PlayerJarated(UserMsg:msg_id, Handle:bf, const players[], playersNum, bool:reliable, bool:init)
-{
-	new client = BfReadByte(bf);
-	new victim = BfReadByte(bf);
-	
-	if (!victim || !IsClientInGame(victim))
-	{
-		return Plugin_Continue;
-	}
-	
-
-	if (TF2_IsPlayerInCondition(victim, TFCond_Jarated))
-	{
-		LogPlyrPlyrEvent(client, victim, "triggered", "jarate", true);
-	}
-	else if (TF2_IsPlayerInCondition(victim, TFCond_Milked))
-	{
-		LogPlyrPlyrEvent(client, victim, "triggered", "madmilk", true);
-	}
-	
-	return Plugin_Continue;
-}
-
-public Action:Event_PlayerShieldBlocked(UserMsg:msg_id, Handle:bf, const players[], playersNum, bool:reliable, bool:init)
-{
-	new victim = BfReadByte(bf);
-	new client = BfReadByte(bf);
-
-	LogPlyrPlyrEvent(client, victim, "triggered", "shield_blocked", true);
-	return Plugin_Continue;
 }
 
 // Modified Octo's method a bit to try and reduce checking of sound strings
@@ -1361,19 +1141,6 @@ public OnConVarBackstabsChange(Handle:cvar, const String:oldVal[], const String:
 	b_backstabs = GetConVarBool(cvar_backstabs);
 }
 
-public OnConVarSandvichChange(Handle:cvar, const String:oldVal[], const String:newVal[])
-{
-	new bool:newval = GetConVarBool(cvar_sandvich);
-	if(newval != b_sandvich)
-	{
-		if(newval)
-			AddNormalSoundHook(SoundHook);
-		else
-			RemoveNormalSoundHook(SoundHook);
-		b_sandvich = newval;
-	}
-}
-
 public OnConVarFireChange(Handle:cvar, const String:oldVal[], const String:newVal[])
 {
 	b_fire = GetConVarBool(cvar_fire);
@@ -1404,3 +1171,33 @@ public OnConVarRolelogfixChange(Handle:cvar, const String:oldVal[], const String
 		b_rolelogfix = newval;
 	}
 }
+
+stock GetClientDistanceToGround(client)
+{
+    // Player is already standing on the ground?
+    if((GetEntityFlags(client) & (FL_ONGROUND | FL_INWATER)) == 1)
+        return 0;
+	
+    new Float:fOrigin[3], Float:fGround[3];
+    GetClientAbsOrigin(client, fOrigin);
+    
+    fOrigin[2] += 10.0;
+    
+    TR_TraceRayFilter(fOrigin, Float:{90.0,0.0,0.0}, MASK_PLAYERSOLID, RayType_Infinite, TraceRayNoPlayers, client);
+    if (TR_DidHit())
+    {
+        TR_GetEndPosition(fGround);
+        fOrigin[2] -= 10.0;
+        return RoundFloat(GetVectorDistance(fOrigin, fGround));
+    }
+    return 0;
+}
+
+public bool:TraceRayNoPlayers(entity, mask, any:data)
+{
+    if(entity == data || (entity >= 1 && entity <= MaxClients))
+    {
+        return false;
+    }
+    return true;
+}  
