@@ -521,7 +521,8 @@ public Action:Event_ThrowGrenade(Handle:event, const String:name[], bool:dontBro
 
 public Action:Event_DisarmGrenade(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	new client = GetEventInt(event, "player");
+	PrintToServer("Test");
+	new client = GetClientOfUserId(GetEventInt(event, "disarmer"));
 	LogPlayerEvent(client, "triggered", "grenade_disarm");
 	
 	return Plugin_Continue;
@@ -789,11 +790,16 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
 					LogPlayerEvent(attacker, "triggered", "first_blood");
 				if (customkill == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
-					&& IsClientInGame(client) && GetClientDistanceToGround(client) >= 100)
+					&& IsClientInGame(client))
 				{
-					LogPlayerEvent(attacker, "triggered", "airshot_headshot");
-					if(GetClientDistanceToGround(attacker) >= 100)
-						LogPlayerEvent(attacker, "triggered", "air2airshot_headshot");
+					if (GetClientDistanceToGround(client) >= 100)
+					{
+						LogPlayerEvent(attacker, "triggered", "airshot_headshot");
+						if(GetClientDistanceToGround(attacker) >= 100)
+							LogPlayerEvent(attacker, "triggered", "air2airshot_headshot");
+					}
+					else if (GetClientDistanceToGround(attacker) >= 100)
+						LogPlayerEvent(attacker, "triggered", "airborne_headshot");
 				}
 			}
 		}
