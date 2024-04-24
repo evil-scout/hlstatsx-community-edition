@@ -81,7 +81,6 @@ new Handle:cvar_headshots;
 new Handle:cvar_backstabs;
 new Handle:cvar_fire;
 new Handle:cvar_wstats;
-new Handle:cvar_rolelogfix;
 
 // Booleans to keep track of them
 new bool:b_actions;
@@ -91,7 +90,6 @@ new bool:b_headshots;
 new bool:b_backstabs;
 new bool:b_fire;
 new bool:b_wstats;
-new bool:b_rolelogfix;
 
 // Monitoring outside libraries/cvars
 new bool:b_sdkhookloaded = false;
@@ -121,14 +119,6 @@ new Handle:h_wearables;
 new Float:f_lastTeleport[MAXPLAYERS+1][MAXPLAYERS+1];
 // Heals
 new healPoints[MAXPLAYERS+1];
-// Rocket/Sticky Jump Status
-new jumpStatus[MAXPLAYERS+1];
-// Last dalokohs eaten
-new Float:dalokohs[MAXPLAYERS+1];
-
-// Last known class of players
-// Likely less intensive to keep track of this for sound hooks
-new TFClassType:playerClass[MAXPLAYERS+1];
 
 // Is player carrying a building
 new bool:g_bCarryingObject[MAXPLAYERS+1] = {false,...};
@@ -217,7 +207,6 @@ public OnPluginStart()
 	cvar_backstabs = CreateConVar("superlogs_backstabs", "1", "Enable logging of backstab player action (default on)", 0, true, 0.0, true, 1.0);
 	cvar_fire = CreateConVar("superlogs_fire", "1", "Enable logging of fiery arrows as a separate weapon from regular arrows (default on)", 0, true, 0.0, true, 1.0);
 	cvar_wstats = CreateConVar("superlogs_wstats", "1", "Enable logging of weapon stats (default on, only works when tf_weapon_criticals is 1)", 0, true, 0.0, true, 1.0);
-	cvar_rolelogfix = CreateConVar("superlogs_rolelogfix", "1", "Enable logging of healpoints upon death (default on)", 0, true, 0.0, true, 1.0);
 
 	HookConVarChange(cvar_crits,OnConVarStatsChange);
 	HookConVarChange(cvar_actions,OnConVarActionsChange);
@@ -227,7 +216,6 @@ public OnPluginStart()
 	HookConVarChange(cvar_backstabs,OnConVarBackstabsChange);
 	HookConVarChange(cvar_fire,OnConVarFireChange);
 	HookConVarChange(cvar_wstats,OnConVarStatsChange);
-	HookConVarChange(cvar_rolelogfix,OnConVarRolelogfixChange);
 
 	h_stunBalls = CreateStack();
 	h_wearables = CreateStack();
@@ -260,7 +248,6 @@ public OnPluginStart()
 	HookEvent("player_builtobject", Event_PlayerBuiltObject);
 	HookEvent("player_builtobject", Event_PlayerBuiltObjectPre, EventHookMode_Pre);
 	HookEvent("player_hurt", Event_PlayerHurt);
-	HookEvent("player_spawn", Event_PlayerSpawn);
 	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
 	//HookEvent("post_inventory_application", Event_PostInventoryApplication);
 	HookEvent("grenade_thrown", Event_ThrowGrenade);
@@ -293,7 +280,6 @@ public OnConfigsExecuted()
 	OnConVarHeadshotsChange(cvar_headshots, "", "");
 	OnConVarBackstabsChange(cvar_backstabs, "", "");
 	OnConVarFireChange(cvar_fire, "", "");
-	OnConVarRolelogfixChange(cvar_rolelogfix, "", "");
 }
 
 public Action:TF2_CalcIsAttackCritical(attacker, weapon, String:weaponname[], &bool:result)
@@ -426,46 +412,6 @@ public OnGameFrame()
 	new owner;
 	new itemindex, slot;
 	decl String:tempstring[15];
-	if(stunBallId > -1)
-	{
-		while(PopStackCell(h_stunBalls, entity))
-		{
-			if(IsValidEntity(entity))
-			{
-				owner = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
-				if(owner > 0 && owner <= MaxClients)
-					weaponStats[owner][stunBallId][LOG_SHOTS]++;
-			}
-		}
-	}
-	while(PopStackCell(h_wearables, entity))
-	{
-		if(IsValidEntity(entity))
-		{
-			owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-			if(owner > 0 && owner <= MaxClients)
-			{
-				itemindex = GetEntProp(entity, Prop_Send, "m_iItemDefinitionIndex");
-				Format(tempstring, sizeof(tempstring), "%d", itemindex);
-				if(KvJumpToKey(itemsKv, tempstring))
-				{
-					KvGetString(itemsKv, "item_slot", tempstring, sizeof(tempstring));
-					if(GetTrieValue(slotsTrie, tempstring, slot))
-					{
-						if(slot == 0 && playerClass[owner] == TFClass_DemoMan)
-							slot++;
-						if(playerLoadout[owner][slot][0] != itemindex)
-						{
-							playerLoadout[owner][slot][0] = itemindex;
-							playerLoadoutUpdated[owner] = true;
-						}
-						playerLoadout[owner][slot][1] = entity;
-					}
-					KvGoBack(itemsKv);
-				}
-			}
-		}
-	}
 	
 	new cnt = GetClientCount();
 	for (new i = 1; i <= cnt; i++)
@@ -493,7 +439,6 @@ public OnClientPutInServer(client)
 		f_lastTeleport[i][client] = 0.0;
 	}
 	f_objRemoved[client] = 0.0;
-	playerClass[client] = TFClass_Unknown;
 	healPoints[client] = 0;
 	for(new i = 0; i < MAX_LOADOUT_SLOTS; i++)
 		playerLoadout[client][i] = {-1, -1};
@@ -536,82 +481,6 @@ HookAllClients()
 			SDKHook(i, SDKHook_OnTakeDamagePost, OnTakeDamage_Post);
 			SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 		}
-}
-
-public Action:Event_PlayerChangeclassPre(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	// Stop log entry!
-	return Plugin_Handled;
-}
-
-public Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new Float:time = GetGameTime();
-	new userid = GetEventInt(event, "userid");
-	new client = GetClientOfUserId(userid);
-	new TFClassType:spawnClass = TFClassType:GetEventInt(event, "class");
-	jumpStatus[client] = JUMP_NONE; // Play it safe
-	if(b_wstats) DumpWeaponStats(client); // Changed class without death, dump and reset stats
-	//if(b_wstats) ResetWeaponStats(client);
-	if(time == f_objRemoved[client])
-	{
-		decl String:owner[96];
-		decl String:player_authid[32];
-		decl String:objname[24];
-		if (!GetClientAuthId(client, AuthId_Engine, player_authid, sizeof(player_authid)))
-			strcopy(player_authid, sizeof(player_authid), "UNKNOWN");
-		Format(owner, sizeof(owner), "\"%N<%d><%s><%s>\"", client, userid, player_authid, g_team_list[GetClientTeam(client)]);
-		new objecttype;
-		while(PopStackCell(h_objList[client], objecttype))
-		{
-			switch(objecttype)
-			{
-				case OBJ_DISPENSER:
-					objname = "OBJ_DISPENSER";
-				case OBJ_TELEPORTER_ENTRANCE:
-					objname = "OBJ_TELEPORTER_ENTRANCE";
-				case OBJ_TELEPORTER_EXIT:
-					objname = "OBJ_TELEPORTER_EXIT";
-				case OBJ_SENTRYGUN:
-					objname = "OBJ_SENTRYGUN";
-				case OBJ_ATTACHMENT_SAPPER:
-					objname = "OBJ_ATTACHMENT_SAPPER";
-				case OBJ_SENTRYGUN_MINI:
-					objname = "OBJ_SENTRYGUN_MINI";
-				default:
-					continue;
-			}
-			LogToGame("%s triggered \"killedobject\" (object \"%s\") (weapon \"pda_engineer\") (objectowner %s) (spawn)", owner, objname, owner);
-		}
-	}
-	if(b_rolelogfix && playerClass[client] != spawnClass)
-	{
-		switch(spawnClass)
-		{
-			case TFClass_Scout:
-				LogRoleChange(client, "scout");
-			case TFClass_Sniper:
-				LogRoleChange(client, "sniper");
-			case TFClass_Soldier:
-				LogRoleChange(client, "soldier");
-			case TFClass_DemoMan:
-				LogRoleChange(client, "demoman");
-			case TFClass_Medic:
-				LogRoleChange(client, "medic");
-			case TFClass_Heavy:
-				LogRoleChange(client, "heavyweapons");
-			case TFClass_Pyro:
-				LogRoleChange(client, "pyro");
-			case TFClass_Spy:
-				LogRoleChange(client, "spy");
-			case TFClass_Engineer:
-				LogRoleChange(client, "engineer");
-			default:
-				LogRoleChange(client, "unknown");
-		}
-	}
-	playerClass[client] = spawnClass;
-	dalokohs[client] = -30.0;
 }
 
 public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadcast)
@@ -737,7 +606,6 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new customkill = GetEventInt(event, "customkill");
 	new bits = GetEventInt(event, "damagebits");
-	jumpStatus[client] = JUMP_NONE; // Not jumping
 	g_bCarryingObject[client] = false;
 	//PrintToServer("Customkill: %i Bits: %i Flags: %i", customkill, bits, death_flags);
 	if(b_actions)
@@ -746,21 +614,6 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 			LogPlayerEvent(client, "triggered", "force_suicide");
 		else
 		{
-			switch(jumpStatus[client])
-			{
-				case 2:
-				{
-					LogPlayerEvent(client, "triggered", "rocket_failjump");
-					if(attacker > 0 && attacker != client)
-						LogPlayerEvent(attacker, "triggered", "rocket_jumper_kill");
-				}
-				case 3:
-				{
-					LogPlayerEvent(client, "triggered", "sticky_failjump");
-					if(attacker > 0 && attacker != client)
-						LogPlayerEvent(attacker, "triggered", "sticky_jumper_kill");
-				}
-			}
 			if(bits & DMG_DROWN)
 			{
 				LogPlayerEvent(client, "triggered", "drowned");
@@ -778,13 +631,6 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 			}
 			else if(attacker != client)
 			{
-				switch(jumpStatus[attacker]) // Don't need to check attacker != 0 here as world will never rocket/sticky jump
-				{
-					case 2:
-						LogPlayerEvent(attacker, "triggered", "rocket_jump_kill");
-					case 3:
-						LogPlayerEvent(attacker, "triggered", "sticky_jump_kill");
-				}
 				if ((bits & DMG_ACID) && attacker > 0 && customkill != TF_CUSTOM_HEADSHOT)
 					LogPlayerEvent(attacker, "triggered", "crit_kill");
 				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
@@ -913,38 +759,6 @@ public Event_WinPanel(Handle:event, const String:name[], bool:dontBroadcast)
 		DumpAllWeaponStats();
 }
 
-// Modified Octo's method a bit to try and reduce checking of sound strings
-public Action:SoundHook(clients[64], &numClients, String:sample[PLATFORM_MAX_PATH], &entity, &channel, &Float:volume, &level, &pitch, &flags)
-{
-	if(entity <= MaxClients && clients[0] == entity && playerClass[entity] == TFClass_Heavy && StrEqual(sample,"vo/SandwichEat09.wav"))
-	{
-		switch(playerLoadout[entity][1][0])
-		{
-			case LUNCHBOX_CHOCOLATE:
-			{
-				LogPlayerEvent(entity, "triggered", "dalokohs");
-				new Float:time = GetGameTime();
-				if(time - dalokohs[entity] > 30)
-					LogPlayerEvent(entity, "triggered", "dalokohs_healthboost");
-				dalokohs[entity] = time;
-				if(GetClientHealth(entity) < 350)
-					LogPlayerEvent(entity, "triggered", "dalokohs_healself");
-			}
-			case LUNCHBOX_STEAK:
-			{
-				LogPlayerEvent(entity, "triggered", "steak");
-			}
-			default:
-			{
-				LogPlayerEvent(entity, "triggered", "sandvich");
-				if(GetClientHealth(entity) < 300)
-					LogPlayerEvent(entity, "triggered", "sandvich_healself");
-			}
-		}
-	}
-	return Plugin_Continue;
-}
-
 public Action:LogMap(Handle:timer)
 {
 	// Called 1 second after OnPluginStart since srcds does not log the first map loaded. Idea from Stormtrooper's "mapfix.sp" for psychostats
@@ -1021,8 +835,6 @@ GetWeaponIndex(const String:weaponname[], client = 0, weapon = -1)
 		if(unlockable && client > 0)
 		{
 			new slot = 0;
-			if(playerClass[client] == TFClass_DemoMan)
-				slot = 1;
 			new itemindex = playerLoadout[client][slot][0];
 			switch(itemindex) // Hell of a lot easier than a set of ifs. <_<
 			{
@@ -1111,8 +923,6 @@ public OnConVarActionsChange(Handle:cvar, const String:oldVal[], const String:ne
 			//UnhookEvent("object_deflected", Event_ObjectDeflected);
 			//UnhookUserMessage(GetUserMessageId("PlayerJarated"), Event_PlayerJarated);
 			//UnhookUserMessage(GetUserMessageId("PlayerShieldBlocked"), Event_PlayerShieldBlocked);
-			for(new i = 1; i <= MaxClients; i++)
-				jumpStatus[i] = 0;
 		}
 		b_actions = newval;
 	}
@@ -1162,19 +972,6 @@ public OnConVarStatsChange(Handle:cvar, const String:oldVal[], const String:newV
 			DumpAllWeaponStats();
 		}
 		b_wstats = newval;
-	}
-}
-
-public OnConVarRolelogfixChange(Handle:cvar, const String:oldVal[], const String:newVal[])
-{
-	new bool:newval = GetConVarBool(cvar_rolelogfix);
-	if(newval != b_rolelogfix)
-	{
-		if(newval)
-			HookEvent("player_changeclass", Event_PlayerChangeclassPre, EventHookMode_Pre);
-		else
-			UnhookEvent("player_changeclass", Event_PlayerChangeclassPre, EventHookMode_Pre);
-		b_rolelogfix = newval;
 	}
 }
 
