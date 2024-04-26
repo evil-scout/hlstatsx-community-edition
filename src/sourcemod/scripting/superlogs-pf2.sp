@@ -726,19 +726,16 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 		
 		if(StrContains(wep, "obj_d") == 0)
 		{
-			SetEventString(event, "weapon", "detonation_dispenser");
 			SetEventString(event, "weapon_logclassname", "detonation_dispenser");
 		}
 		else if(StrContains(wep, "obj_t") == 0)
 		{
 			if(customkill == 10)
 			{
-			SetEventString(event, "weapon", "detonation_teleporter");
 			SetEventString(event, "weapon_logclassname", "detonation_teleporter");
 			}
 			else
 			{
-			SetEventString(event, "weapon", "telefrag");
 			SetEventString(event, "weapon_logclassname", "telefrag");
 			}
 
