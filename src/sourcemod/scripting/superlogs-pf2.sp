@@ -574,6 +574,22 @@ public Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 			}
 		}
 	}
+	
+	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	new custom = GetEventInt(event, "custom");
+	
+	if (custom == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients && IsClientInGame(client))
+	{
+		if (GetClientDistanceToGround(client) >= 100)
+		{
+			LogPlayerEvent(attacker, "triggered", "airshot_headshot");
+			if(GetClientDistanceToGround(attacker) >= 100)
+				LogPlayerEvent(attacker, "triggered", "air2airshot_headshot");
+		}
+		else if (GetClientDistanceToGround(attacker) >= 100)
+			LogPlayerEvent(attacker, "triggered", "airborne_headshot");
+	}
 }
 
 public Action:Event_PlayerBuiltObjectPre(Handle:event, const String:name[], bool:dontBroadcast)
@@ -635,18 +651,6 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 					LogPlayerEvent(attacker, "triggered", "crit_kill");
 				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
 					LogPlayerEvent(attacker, "triggered", "first_blood");
-				if (customkill == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
-					&& IsClientInGame(client))
-				{
-					if (GetClientDistanceToGround(client) >= 100)
-					{
-						LogPlayerEvent(attacker, "triggered", "airshot_headshot");
-						if(GetClientDistanceToGround(attacker) >= 100)
-							LogPlayerEvent(attacker, "triggered", "air2airshot_headshot");
-					}
-					else if (GetClientDistanceToGround(attacker) >= 100)
-						LogPlayerEvent(attacker, "triggered", "airborne_headshot");
-				}
 			}
 		}
 	}
