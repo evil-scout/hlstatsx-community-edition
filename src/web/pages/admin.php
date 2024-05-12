@@ -461,11 +461,6 @@ class EditList
 						$this->errors[] = "Required column '$col->title' must have a value for row '$row'";
 						$rowerror = true;
 					}
-					
-					if ($col->name == ('reward_player' || 'reward_team') && $value == ('' || null))
-					{
-						$value = '0';
-					}
 					elseif ($col->type == "ipaddress" && !preg_match("/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/", $value))
 					{
 						$this->errors[] = "Column '$col->title' requires a valid IP address for row '$row'";
