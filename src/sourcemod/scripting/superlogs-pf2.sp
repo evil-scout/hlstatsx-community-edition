@@ -325,7 +325,7 @@ public Action:OnGameLog(const String:message[])
 
 public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	if(b_actions && attacker > 0 && attacker <= MaxClients && attacker != victim && inflictor > MaxClients && damage > 0.0 && IsValidEntity(inflictor) && GetClientDistanceToGround(victim) >= 100)
+	if(b_actions && attacker > 0 && attacker <= MaxClients && attacker != victim && inflictor > MaxClients && damage > 0.0 && IsValidEntity(inflictor) && GetClientTeam(victim) != GetClientTeam(attacker) && GetClientDistanceToGround(victim) >= 100)
 	{
 		decl String:weapon[WEAPON_FULL_LENGTH];
 		GetEdictClassname(inflictor, weapon, sizeof(weapon));
@@ -494,6 +494,11 @@ public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadc
 		{
 			LogPlayerEvent(userid, "triggered", "teleport_self_again");
 		}
+		else if(GetClientTeam(builderid) == GetClientTeam(userid))
+		{
+			LogPlayerEvent(builderid, "triggered", "teleport_enemy_again");
+			LogPlayerEvent(userid, "triggered", "teleport_enemy_used_again");
+		}
 		else
 		{
 			LogPlayerEvent(builderid, "triggered", "teleport_again");
@@ -505,6 +510,11 @@ public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadc
 		if(userid == builderid)
 		{
 			LogPlayerEvent(userid, "triggered", "teleport_self");
+		}
+		else if(GetClientTeam(builderid) == GetClientTeam(userid))
+		{
+			LogPlayerEvent(builderid, "triggered", "teleport_enemy");
+			LogPlayerEvent(userid, "triggered", "teleport_enemy_used");
 		}
 		else
 		{
@@ -636,7 +646,7 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
 					LogPlayerEvent(attacker, "triggered", "first_blood");
 				if (customkill == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
-					&& IsClientInGame(client))
+					&& IsClientInGame(client) && GetClientTeam(client) != GetClientTeam(attacker))
 				{
 					if (GetClientDistanceToGround(client) >= 100)
 					{
