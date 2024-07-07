@@ -679,7 +679,9 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 		
 		if(StrContains(wep, "emp_p") == 0 && customkill == 0)
 		{
-			SetEventString(event, "weapon", "tf_ammo_pack");
+			//Let's just make it an action instead
+			//SetEventString(event, "weapon", "tf_ammo_pack");
+			LogPlayerEvent(attacker, "triggered", "ammokill");
 		}
 	}
 	
