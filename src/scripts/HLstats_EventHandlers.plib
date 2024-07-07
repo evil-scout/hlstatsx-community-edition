@@ -1702,14 +1702,14 @@ sub doEvent_PlayerAction
 						$g_servers{$s_addr}->{lastblueflagdefend} = $ev_remotetime;
 					}
 				}
-				elsif ($action eq "flagevent_dropped")
+				elsif ($action eq "flagevent_threw")
 				{
 					if ($player->{team} eq "Red" && ($ev_remotetime - $g_servers{$s_addr}->{lastblueflagdefend}) <= 1) {
 						$g_servers{$s_addr}->{lastblueflagdefend} = 0;
-						$action="flagevent_dropped_death";
+						$action="flagevent_threw_death";
 					} elsif ($player->{team} eq "Blue" && ($ev_remotetime - $g_servers{$s_addr}->{lastredflagdefend}) <= 1) {
 						$g_servers{$s_addr}->{lastredflagdefend} = 0;
-						$action="flagevent_dropped_death";
+						$action="flagevent_threw_death";
 					}
 				}
 				elsif ($action eq "player_extinguished")
