@@ -730,6 +730,8 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 			}
 	}
 	
+	//No longer needed, redundant after my changes to 0.7.3
+	/*
 	if(victim != attacker)
 	{
 		GetEventString(event, "weapon", wep, sizeof(wep), "");
@@ -751,6 +753,7 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 
 		}
 	}
+	*/
 	return Plugin_Continue;
 }
 
