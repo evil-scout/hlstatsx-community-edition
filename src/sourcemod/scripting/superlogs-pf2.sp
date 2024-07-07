@@ -465,7 +465,6 @@ public Action:Event_ThrowGrenade(Handle:event, const String:name[], bool:dontBro
 
 public Action:Event_DisarmGrenade(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	PrintToServer("Test");
 	new client = GetClientOfUserId(GetEventInt(event, "disarmer"));
 	LogPlayerEvent(client, "triggered", "grenade_disarm");
 	
@@ -701,30 +700,16 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 			}
 	}
 	
-	//No longer needed, redundant after my changes to 0.7.3
-	/*
 	if(victim != attacker)
 	{
 		GetEventString(event, "weapon", wep, sizeof(wep), "");
 		
-		if(StrContains(wep, "obj_d") == 0)
+		if(StrContains(wep, "emp_p") == 0 && customkill == 0)
 		{
-			SetEventString(event, "weapon", "detonation_dispenser");
-		}
-		else if(StrContains(wep, "obj_t") == 0)
-		{
-			if(customkill == 10)
-			{
-			SetEventString(event, "weapon", "detonation_teleporter");
-			}
-			else
-			{
-			SetEventString(event, "weapon", "telefrag");
-			}
-
+			SetEventString(event, "weapon", "tf_ammo_pack");
 		}
 	}
-	*/
+	
 	return Plugin_Continue;
 }
 
