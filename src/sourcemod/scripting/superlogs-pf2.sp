@@ -32,7 +32,7 @@
 #define NAME "SuperLogs: PF2"
 
 #define UNLOCKABLE_BIT (1<<30)
-#define MAX_LOG_WEAPONS 28
+#define MAX_LOG_WEAPONS 27
 #define MAX_WEAPON_LEN 29
 #define MAX_BULLET_WEAPONS 14
 #define MAX_UNLOCKABLE_WEAPONS 6
@@ -156,7 +156,6 @@ new const String:weaponList[MAX_LOG_WEAPONS][MAX_WEAPON_LEN] = {
 	"tf_projectile_pipe_remote",
 	"sticky_resistance",
 	"tf_projectile_rocket",
-	"rocketlauncher_directhit",
 	"deflect_rocket",
 	"deflect_promode",
 	"deflect_flare",
@@ -562,7 +561,7 @@ public Event_PlayerHurt(Handle:event, const String:name[], bool:dontBroadcast)
 			{
 				switch(GetEventInt(event, "weaponid"))
 				{
-					case TF_WEAPON_ROCKETLAUNCHER, TF_WEAPON_DIRECTHIT:
+					case TF_WEAPON_ROCKETLAUNCHER:
 					{
 						LogPlayerEvent(attacker, "triggered", "airshot_rocket");
 						if(GetClientDistanceToGround(attacker) >= 100)
@@ -620,7 +619,7 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 	//PrintToServer("Customkill: %i Bits: %i Flags: %i", customkill, bits, death_flags);
 	if(b_actions)
 	{
-		if(attacker == client && customkill == TF_CUSTOM_SUICIDE)
+		if(attacker == client && customkill == TF_DMG_CUSTOM_SUICIDE)
 			LogPlayerEvent(client, "triggered", "force_suicide");
 		else
 		{
@@ -641,11 +640,9 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 			}
 			else if(attacker != client)
 			{
-				if ((bits & DMG_ACID) && attacker > 0 && customkill != TF_CUSTOM_HEADSHOT)
+				if ((bits & DMG_ACID) && attacker > 0 && customkill != TF_DMG_CUSTOM_HEADSHOT)
 					LogPlayerEvent(attacker, "triggered", "crit_kill");
-				else if((death_flags & TF_DEATHFLAG_FIRSTBLOOD) == TF_DEATHFLAG_FIRSTBLOOD)
-					LogPlayerEvent(attacker, "triggered", "first_blood");
-				if (customkill == TF_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
+				if (customkill == TF_DMG_CUSTOM_HEADSHOT && client > 0 && client <= MaxClients
 					&& IsClientInGame(client) && GetClientTeam(client) != GetClientTeam(attacker))
 				{
 					if (GetClientDistanceToGround(client) >= 100)
@@ -668,7 +665,7 @@ public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 		if(weapon_index != -1)
 		{
 			weaponStats[attacker][weapon_index][LOG_KILLS]++;
-			if(customkill == TF_CUSTOM_HEADSHOT)
+			if(customkill == TF_DMG_CUSTOM_HEADSHOT)
 				weaponStats[attacker][weapon_index][LOG_HEADSHOTS]++;
 			weaponStats[client][weapon_index][LOG_DEATHS]++;
 			if(GetClientTeam(client) == GetClientTeam(attacker))
@@ -692,41 +689,15 @@ public Action:Event_PlayerDeathPre(Handle:event, const String:name[], bool:dontB
 	
 	switch (customkill)
 	{
-		case TF_CUSTOM_HEADSHOT:
+		case TF_DMG_CUSTOM_HEADSHOT:
 			if(b_headshots)
 			{
 				LogPlyrPlyrEvent(attacker, victim, "triggered", "headshot");
 			}
-		case TF_CUSTOM_BACKSTAB:
+		case TF_DMG_CUSTOM_BACKSTAB:
 			if(b_backstabs)
 			{
 				LogPlyrPlyrEvent(attacker, victim, "triggered", "backstab");
-			}
-		case TF_CUSTOM_BURNING_ARROW, TF_CUSTOM_FLYINGBURN:
-			if(b_fire)
-			{
-				decl String:logweapon[64];
-				GetEventString(event, "weapon_logclassname", logweapon, sizeof(logweapon));
-				if(logweapon[0] != 'd') // No changing reflects - was 'r' but it is deflects
-				{
-					SetEventString(event, "weapon_logclassname", "tf_projectile_arrow_fire");
-				}
-			}
-		case TF_CUSTOM_TAUNT_UBERSLICE:
-			{
-				if(GetEventInt(event, "weaponid") == TF_WEAPON_BONESAW)
-				{
-					SetEventString(event, "weapon_logclassname", "taunt_medic");
-					
-					// Might as well fix the kill icon, too, as long as we're here
-					// Courtesy of FlaminSarge
-					SetEventString(event, "weapon", "taunt_medic");
-				}
-			}
-		
-		case TF_CUSTOM_DECAPITATION_BOSS:
-			{
-				LogPlayerEvent(attacker, "triggered", "killed_by_horseman", true);
 			}
 	}
 	
@@ -806,8 +777,6 @@ PopulateWeaponTrie()
 	}
 	if(GetTrieValue(h_weapontrie, "tf_projectile_rocket", index))
 		SetTrieValue(h_weapontrie, "rocketlauncher", index);
-	if(GetTrieValue(h_weapontrie, "rocketlauncher_directhit", index))
-		SetTrieValue(h_weapontrie, "tf_projectile_rocket_dh", index);
 	if(GetTrieValue(h_weapontrie, "tf_projectile_pipe", index))
 		SetTrieValue(h_weapontrie, "grenadelauncher", index);
 	if(GetTrieValue(h_weapontrie, "tf_projectile_pipe_remote", index))
