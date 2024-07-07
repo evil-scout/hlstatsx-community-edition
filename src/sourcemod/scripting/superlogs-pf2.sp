@@ -375,28 +375,6 @@ public OnTakeDamage_Post(victim, attacker, inflictor, Float:damage, damagetype)
 			GetClientWeapon(attacker, weapon, sizeof(weapon));
 			weapon_index = GetWeaponIndex(weapon[WEAPON_PREFIX_LENGTH], attacker);
 		}
-		else if (IsValidEdict(inflictor))
-		{
-			GetEdictClassname(inflictor, weapon, sizeof(weapon));
-			if (weapon[WEAPON_PREFIX_LENGTH] == 'g')
-				return; // grenadelauncher, but the projectile does damage, not the weapon. So this must be Charge N Targe.
-			else if(weapon[3] == 'p')
-			{
-				weapon_index = GetWeaponIndex(weapon, attacker, inflictor);
-			}
-			else
-			{
-				// Baseballs are funky.
-				// Inflictor is the BAT
-				// But the melee Crush damage (and the nevergib I don't check here) aren't set
-				// Still has CLUB damage though, and on a melee strike the inflictor is the PLAYER, not the weapon
-				// Just in case either way, forcing it to get the index of "ball"
-				if(!(damagetype & DMG_CRUSH) && (damagetype & DMG_CLUB) && StrEqual(weapon, "tf_weapon_bat_wood"))
-					weapon_index = GetWeaponIndex("ball", attacker);
-				else
-					weapon_index = GetWeaponIndex(weapon[WEAPON_PREFIX_LENGTH], attacker);
-			}
-		}
 		if(b_wstats && weapon_index > -1)
 		{
 			weaponStats[attacker][weapon_index][LOG_DAMAGE] += idamage;
@@ -407,11 +385,6 @@ public OnTakeDamage_Post(victim, attacker, inflictor, Float:damage, damagetype)
 
 public OnGameFrame()
 {
-	new entity;
-	new owner;
-	new itemindex, slot;
-	decl String:tempstring[15];
-	
 	new cnt = GetClientCount();
 	for (new i = 1; i <= cnt; i++)
 	{
@@ -777,7 +750,7 @@ PopulateWeaponTrie()
 	}
 }
 
-GetWeaponIndex(const String:weaponname[], client = 0, weapon = -1)
+GetWeaponIndex(const String:weaponname[], client = 0)
 {
 	new index;
 	new bool:unlockable;
@@ -810,19 +783,6 @@ GetWeaponIndex(const String:weaponname[], client = 0, weapon = -1)
 	}
 	else
 		return -1;
-}
-
-DumpHeals(client, String:addProp[] = "")
-{
-	new curHeals = GetEntProp(client, Prop_Send, "m_iHealPoints");
-	new lifeHeals = curHeals - healPoints[client];
-	if(lifeHeals > 0)
-	{
-		decl String:szProperties[32];
-		Format(szProperties, sizeof(szProperties), " (healing \"%d\")%s", lifeHeals, addProp);
-		LogPlayerEvent(client, "triggered", "healed", _, szProperties);
-	}
-	healPoints[client] = curHeals;
 }
 
 DumpAllWeaponStats()
