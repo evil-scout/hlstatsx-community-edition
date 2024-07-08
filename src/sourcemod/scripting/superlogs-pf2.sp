@@ -465,7 +465,7 @@ public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadc
 		{
 			LogPlayerEvent(userid, "triggered", "teleport_self_again");
 		}
-		else if(GetClientTeam(builderid) == GetClientTeam(userid))
+		else if(GetClientTeam(builderid) != GetClientTeam(userid))
 		{
 			LogPlayerEvent(builderid, "triggered", "teleport_enemy_again");
 			LogPlayerEvent(userid, "triggered", "teleport_enemy_used_again");
@@ -482,7 +482,7 @@ public Event_PlayerTeleported(Handle:event, const String:name[], bool:dontBroadc
 		{
 			LogPlayerEvent(userid, "triggered", "teleport_self");
 		}
-		else if(GetClientTeam(builderid) == GetClientTeam(userid))
+		else if(GetClientTeam(builderid) != GetClientTeam(userid))
 		{
 			LogPlayerEvent(builderid, "triggered", "teleport_enemy");
 			LogPlayerEvent(userid, "triggered", "teleport_enemy_used");
