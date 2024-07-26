@@ -1669,9 +1669,9 @@ sub doEvent_PlayerAction
 				if (defined($properties{objectowner})) {
 					my $owner = $properties{objectowner};
 					$owner =~ s!\[U:1:(\d+)\]!'STEAM_0:'.($1 % 2).':'.int($1 / 2)!eg;
-					$owner = $1 / 2;
-					$ownerappend = "0:";
-					$owner = $ownerappend.$owner;
+					$owner =~ s/^STEAM_[0-9]+?\://;
+					$owner =~ s/^[^_0:]*_0://;
+					$owner =~ s/\>.*//;
 					if ($owner eq $player->{uniqueid}) {
 						$ownerstring = "owner_";
 					}
