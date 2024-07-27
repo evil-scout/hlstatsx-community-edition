@@ -898,8 +898,11 @@ color_team_entities(String:message[192])
 				}
 				if (ColorSlotArray[3] > -1)
 				{
-					if (ReplaceString(message, sizeof(message), "Blue ", "\x03Blue\x01 ") > 0)
+					if (ReplaceString(message, sizeof(message), "Blue ", "") > 0)
 					{
+						new String: blue[8];
+						blue = "Blue";
+						Format(message, sizeof(message), "\x03%s\x01 %s", blue, message);
 						return ColorSlotArray[3];
 					}
 				}
